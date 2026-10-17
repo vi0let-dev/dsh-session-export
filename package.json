@@ -1,0 +1,60 @@
+{
+  "name": "dsh-session-export",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "会话导出：在设置中选择一个或多个会话，导出用户提问与最终回答（可含思考、工具与运行时上下文），支持 Markdown 与 JSON。",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "icon.svg",
+    "locale/*.json",
+    "docs/banner.png",
+    "README.md",
+    "LICENSE",
+    "test"
+  ],
+  "icon": "./icon.svg",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vi0let-dev/dsh-session-export.git"
+  },
+  "homepage": "https://github.com/vi0let-dev/dsh-session-export#readme",
+  "bugs": {
+    "url": "https://github.com/vi0let-dev/dsh-session-export/issues"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "session",
+    "export",
+    "markdown"
+  ],
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "scripts": {
+    "test": "node test/smoke.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": []
+    }
+  },
+  "license": "MIT"
+}

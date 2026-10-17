@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Session export",
+    "description": "Export one or more sessions from Settings: user questions and final answers by default, with optional reasoning, tool calls, and runtime context."
+  }
+}

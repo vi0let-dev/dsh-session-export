@@ -1,0 +1,10 @@
+# dsh-session-export — bundle patch.
+#
+# One insert mounts the Host half (the /api/dsh-session-export routes).
+# The browser half is declared by package.json's dsh.client and binds to the
+# row whose `name` is exactly the bare package name. Keep this name, the
+# package name, and the ModuleLoader id in client.js identical.
+- insert:
+    - id: session-export
+      name: 'dsh-session-export'
+      config: {}
