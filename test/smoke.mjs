@@ -351,7 +351,72 @@ await test('renderMarkdown omits optional sections by default and includes them 
   }
   const questionsOnlyMarkdown = __internal.renderMarkdown(questionsOnly, 'zh')
   assert.match(questionsOnlyMarkdown, /Question one/)
-  assert.doesNotMatch(questionsOnlyMarkdown, /#### 最终回答/)
+  assert.doesNotMatch(questionsOnlyMarkdown, /\*\*最终回答\*\*/)
+})
+
+await test('normalizeContentHeadings nests message headings below the export heading', () => {
+  const source = [
+    '# 一级',
+    '正文',
+    '## 二级',
+    '### 三级',
+    '#### 四级',
+    '',
+    '```md',
+    '# 代码块里的井号不是标题',
+    '```',
+    '',
+    '> ## 引用里的标题',
+    '##### 五级',
+    '###### 六级',
+  ].join('\n')
+  const nested = __internal.normalizeContentHeadings(source, 4)
+  assert.match(nested, /^#### 一级$/m)
+  assert.match(nested, /^##### 二级$/m)
+  assert.match(nested, /^###### 三级$/m)
+  assert.match(nested, /^###### 四级$/m)
+  assert.match(nested, /^# 代码块里的井号不是标题$/m)
+  assert.match(nested, /^> ##### 引用里的标题$/m)
+  // The message already consumes h4–h6; deeper levels cap at h6.
+  assert.match(nested, /^###### 五级$/m)
+  assert.match(nested, /^###### 六级$/m)
+})
+
+await test('normalizeContentHeadings promotes deep-only headings and leaves non-headings alone', () => {
+  assert.equal(
+    __internal.normalizeContentHeadings('##### 五级\n###### 六级', 4),
+    '#### 五级\n##### 六级',
+  )
+  assert.equal(
+    __internal.normalizeContentHeadings('没有标题\n#也不是标题\n####### 七个井号也不合规', 4),
+    '没有标题\n#也不是标题\n####### 七个井号也不合规',
+  )
+  assert.equal(__internal.normalizeContentHeadings('', 4), '')
+})
+
+await test('renderMarkdown nests final-answer headings and keeps fenced code intact', () => {
+  const events = fixtureEvents()
+  events[6].data.message.content[0].text =
+    '# 结论\n\n## 细节\n\n```md\n# 代码块里的井号不是标题\n```'
+  const data = {
+    exportedAt: 1_700_000_000_000,
+    options: DEFAULTS,
+    format: 'markdown',
+    sessions: [
+      __internal.extractSession(
+        { header: header(), events },
+        { title: 'Test session', updatedAt: 1_700_000_000_000 },
+        DEFAULTS,
+      ),
+    ],
+  }
+  const markdown = __internal.renderMarkdown(data, 'zh')
+  assert.match(markdown, /^\*\*用户提问\*\*$/m)
+  assert.match(markdown, /^\*\*最终回答\*\*$/m)
+  assert.doesNotMatch(markdown, /^#### 最终回答$/m)
+  assert.match(markdown, /^#### 结论$/m)
+  assert.match(markdown, /^##### 细节$/m)
+  assert.match(markdown, /^# 代码块里的井号不是标题$/m)
 })
 
 await test('renderJson is valid and keeps the normalized turn shape', () => {

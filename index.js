@@ -908,6 +908,93 @@ function oneLine(value) {
   return value.replace(/\s+/g, ' ').trim()
 }
 
+/** Deepest ATX heading level Markdown supports. */
+const MAX_HEADING_LEVEL = 6
+
+/** Message content nests directly below the turn heading (`###`). */
+const CONTENT_HEADING_BASE = 4
+
+/** ATX heading with optional blockquote markers; at most 3 leading spaces. */
+const ATX_HEADING = /^((?: {0,3}>[ \t]?)*)( {0,3})(#{1,6})([ \t]+|$)(.*)$/
+
+/** Code fence opening (3+ backticks or tildes, at most 3 leading spaces). */
+const FENCE_OPEN = /^( {0,3})(`{3,}|~{3,})(.*)$/
+
+/** Code fence closing (same character, at least as long, no info string). */
+const FENCE_CLOSE = /^( {0,3})(`{3,}|~{3,})[ \t]*\r?$/
+
+/** Whether a line starts a fenced code block; backtick info strings may not contain backticks. */
+function openingFence(line) {
+  const match = FENCE_OPEN.exec(line)
+  if (match === null) return undefined
+  const marker = match[2]
+  if (marker[0] === '`' && match[3].includes('`')) return undefined
+  return { char: marker[0], length: marker.length }
+}
+
+/** Whether a line closes the given fenced code block. */
+function closesFence(line, fence) {
+  const match = FENCE_CLOSE.exec(line)
+  return match !== null && match[2][0] === fence.char && match[2].length >= fence.length
+}
+
+/**
+ * Re-level the ATX headings inside one message so the shallowest heading sits
+ * directly below the surrounding export heading.
+ *
+ * Conversations routinely start at `#` or `##`, which used to collide with the
+ * exporter's own `## 会话` / `### 第 N 轮` sections. This preserves the relative
+ * hierarchy inside the message, caps levels deeper than h6, and leaves fenced
+ * code blocks byte-for-byte untouched.
+ */
+function normalizeContentHeadings(text, baseLevel = CONTENT_HEADING_BASE) {
+  const value = typeof text === 'string' ? text : String(text ?? '')
+  if (value === '') return value
+  const lines = value.split(/\r?\n/)
+
+  let fence
+  let shallowest = MAX_HEADING_LEVEL + 1
+  for (const line of lines) {
+    if (fence !== undefined) {
+      if (closesFence(line, fence)) fence = undefined
+      continue
+    }
+    const opened = openingFence(line)
+    if (opened !== undefined) {
+      fence = opened
+      continue
+    }
+    const match = ATX_HEADING.exec(line)
+    if (match !== null) shallowest = Math.min(shallowest, match[3].length)
+  }
+  if (shallowest > MAX_HEADING_LEVEL) return value
+
+  const shift = baseLevel - shallowest
+  fence = undefined
+  const out = []
+  for (const line of lines) {
+    if (fence !== undefined) {
+      out.push(line)
+      if (closesFence(line, fence)) fence = undefined
+      continue
+    }
+    const opened = openingFence(line)
+    if (opened !== undefined) {
+      fence = opened
+      out.push(line)
+      continue
+    }
+    const match = ATX_HEADING.exec(line)
+    if (match === null) {
+      out.push(line)
+      continue
+    }
+    const level = Math.max(1, Math.min(MAX_HEADING_LEVEL, match[3].length + shift))
+    out.push(`${match[1]}${match[2]}${'#'.repeat(level)}${match[4] ?? ''}${match[5]}`)
+  }
+  return out.join('\n')
+}
+
 /** Choose a Markdown fence longer than any run of backticks inside the body. */
 function fencedBlock(text, language) {
   const value = typeof text === 'string' ? text : String(text ?? '')
@@ -984,9 +1071,9 @@ function renderMarkdown(data, locale) {
       lines.push(`<summary>${labels.system} (${session.context.length})</summary>`)
       lines.push('')
       for (const item of session.context) {
-        lines.push(`#### ${item.kind}`)
+        lines.push(`**${item.kind}**`)
         lines.push('')
-        lines.push(item.text)
+        lines.push(normalizeContentHeadings(item.text))
         lines.push('')
       }
       lines.push('</details>')
@@ -1005,21 +1092,27 @@ function renderMarkdown(data, locale) {
       lines.push('')
 
       for (const user of turn.users) {
-        lines.push(`#### ${labels.user}`)
+        lines.push(`**${labels.user}**`)
         lines.push('')
-        lines.push(user.text.trim() === '' ? `_${labels.none}_` : user.text)
+        lines.push(
+          user.text.trim() === '' ? `_${labels.none}_` : normalizeContentHeadings(user.text),
+        )
         lines.push('')
         appendAttachmentLines(lines, user.attachments, labels)
       }
 
       if (data.options.assistant) {
-        lines.push(`#### ${labels.assistant}`)
+        lines.push(`**${labels.assistant}**`)
         lines.push('')
         if (turn.assistant === null) {
           lines.push(`_${turn.incomplete ? labels.noFinalYet : labels.noFinalText}_`)
           lines.push('')
         } else {
-          lines.push(turn.assistant.text.trim() === '' ? `_${labels.noFinalText}_` : turn.assistant.text)
+          lines.push(
+            turn.assistant.text.trim() === ''
+              ? `_${labels.noFinalText}_`
+              : normalizeContentHeadings(turn.assistant.text),
+          )
           lines.push('')
           appendAttachmentLines(lines, turn.assistant.attachments, labels)
         }
@@ -1030,7 +1123,7 @@ function renderMarkdown(data, locale) {
         lines.push(`<summary>${labels.reasoning} (${turn.reasoning.length})</summary>`)
         lines.push('')
         for (const item of turn.reasoning) {
-          lines.push(item.text)
+          lines.push(normalizeContentHeadings(item.text))
           lines.push('')
         }
         lines.push('</details>')
@@ -1042,7 +1135,7 @@ function renderMarkdown(data, locale) {
         lines.push(`<summary>${labels.tools} (${turn.tools.length})</summary>`)
         lines.push('')
         for (const tool of turn.tools) {
-          lines.push(`##### ${labels.toolCall}: ${tool.name ?? 'tool'}`)
+          lines.push(`**${labels.toolCall}: ${tool.name ?? 'tool'}**`)
           lines.push('')
           if (tool.arguments !== undefined) lines.push(fencedBlock(formatArguments(tool.arguments), 'json'))
           else lines.push(`_${labels.noContent}_`)
@@ -1354,6 +1447,7 @@ export const __internal = {
   listSessions,
   loadSession,
   buildExport,
+  normalizeContentHeadings,
   renderMarkdown,
   renderJson,
   exportFilename,

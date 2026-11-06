@@ -62,7 +62,7 @@
 dsh plugin --profile desktop add github:vi0let-dev/dsh-session-export
 
 # 锁定到某个 tag（推荐，避免以后 main 变化）
-dsh plugin --profile desktop add github:vi0let-dev/dsh-session-export#v1.0.0
+dsh plugin --profile desktop add github:vi0let-dev/dsh-session-export#v1.0.1
 ```
 
 GitHub 直装会在 profile 里放一份副本，不依赖本地插件目录；以后更新插件需要重新安装。
@@ -119,13 +119,23 @@ dsh-sessions-3-20261017-2315.json
 - 会话 ID / 工作目录 / 创建时间 / 最后活动 / 状态
 
 ### 第 1 轮 · 时间
-#### 用户提问
+
+**用户提问**
+
 ...
-#### 最终回答
+
+**最终回答**
+
+#### 回答里的第一级标题
+##### 回答里的第二级标题
 ...
 
 （勾选思考过程 / 工具调用时，会以折叠块附在对应轮次下）
 ```
+
+消息正文自带的 Markdown 标题会按**相对层级**整体嵌套到 `h4`–`h6`（例如正文里的 `#` 变成 `####`、`##` 变成 `#####`），
+避免和导出结构（会话 `h2` / 轮次 `h3`）抢标题层级；超过 `h6` 的更深层级会合并到 `h6`。
+代码围栏（三个反引号或波浪号）里的 `#` 是代码内容，不会被改动。
 
 ### JSON 结构
 
@@ -194,13 +204,14 @@ dsh-sessions-3-20261017-2315.json
 node test/smoke.mjs
 ```
 
-当前 16 项测试覆盖：
+当前 19 项测试覆盖：
 
 - 包名 / bundle patch / client id / locale / icon 一致性；
 - 默认内容只包含用户提问与最终回答；
 - 思考、工具、系统上下文按选项出现；
 - 未结束轮次的「进行中」判定；
 - Markdown / JSON 渲染、多会话合并、文件名清洗；
+- 正文标题按相对层级嵌套到 h4–h6，代码块内容不受影响；
 - 回环 Host 与自定义请求头校验；
 - `GET /list`、`POST /export`（活动会话与冷会话两条读路径）；
 - `apply` 的 webServer 路由挂载；
@@ -231,9 +242,15 @@ dsh plugin --profile desktop remove dsh-session-export
 
 卸载后重启 DSH。插件不保留任何持久状态。
 
+## 更新记录
+
+- **1.0.1**：修复 Markdown 导出中正文标题与文档结构抢层级的问题。`用户提问` / `最终回答` 改为加粗标签，
+  正文标题按相对层级嵌套到 `h4`–`h6`，代码块内的 `#` 保持不变。
+- **1.0.0**：首个版本。
+
 ## 版本
 
-- 插件版本：`1.0.0`
+- 插件版本：`1.0.1`
 - 开发/验证环境：DSH `0.2.1-rc.2` 桌面端，Node `24.x`
 - 许可证：MIT
 
