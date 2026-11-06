@@ -1,6 +1,6 @@
 {
   "name": "dsh-session-export",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "type": "module",
   "description": "会话导出：在设置中选择一个或多个会话，导出用户提问与最终回答（可含思考、工具与运行时上下文），支持 Markdown 与 JSON。",

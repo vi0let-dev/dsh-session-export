@@ -938,9 +938,34 @@ function closesFence(line, fence) {
   return match !== null && match[2][0] === fence.char && match[2].length >= fence.length
 }
 
+/** Setext heading underline: a run of `=` or `-` below paragraph text. */
+const SETEXT_UNDERLINE = /^( {0,3})(=+|-+)[ \t]*\r?$/
+
+/**
+ * Whether a line can be the paragraph text above a setext underline.
+ *
+ * Setext syntax is easy to trigger by accident when a user pastes a console
+ * log: a row of `===` or `---` directly below a status line turns that line
+ * into an h1/h2. Only plain paragraph continuations are considered here;
+ * headings, lists, code, quotes, tables and HTML blocks are not.
+ */
+function isParagraphLine(line) {
+  if (line.trim() === '') return false
+  if (/^ {4,}/.test(line) || /^\t/.test(line)) return false
+  if (ATX_HEADING.test(line)) return false
+  if (SETEXT_UNDERLINE.test(line)) return false
+  if (/^ {0,3}(?:[-*_][ \t]*){3,}$/.test(line)) return false
+  if (/^ {0,3}(?:[-*+]|\d+[.)])[ \t]+/.test(line)) return false
+  if (/^ {0,3}>/.test(line)) return false
+  if (/^ {0,3}(?:```|~~~)/.test(line)) return false
+  if (/^ {0,3}<(?:!--|\/?[A-Za-z])/.test(line)) return false
+  return true
+}
+
 /**
  * Re-level the ATX headings inside one message so the shallowest heading sits
- * directly below the surrounding export heading.
+ * directly below the surrounding export heading, and neutralize accidental
+ * setext headings created by pasted logs (`====` / `----` under a text line).
  *
  * Conversations routinely start at `#` or `##`, which used to collide with the
  * exporter's own `## 会话` / `### 第 N 轮` sections. This preserves the relative
@@ -953,26 +978,42 @@ function normalizeContentHeadings(text, baseLevel = CONTENT_HEADING_BASE) {
   const lines = value.split(/\r?\n/)
 
   let fence
+  let previousParagraph = false
+  const neutralized = new Set()
   let shallowest = MAX_HEADING_LEVEL + 1
-  for (const line of lines) {
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]
     if (fence !== undefined) {
+      previousParagraph = false
       if (closesFence(line, fence)) fence = undefined
       continue
     }
     const opened = openingFence(line)
     if (opened !== undefined) {
       fence = opened
+      previousParagraph = false
       continue
     }
     const match = ATX_HEADING.exec(line)
-    if (match !== null) shallowest = Math.min(shallowest, match[3].length)
+    if (match !== null) {
+      shallowest = Math.min(shallowest, match[3].length)
+      previousParagraph = false
+      continue
+    }
+    if (previousParagraph && SETEXT_UNDERLINE.test(line)) {
+      neutralized.add(index)
+      previousParagraph = false
+      continue
+    }
+    previousParagraph = isParagraphLine(line)
   }
-  if (shallowest > MAX_HEADING_LEVEL) return value
+  if (shallowest > MAX_HEADING_LEVEL && neutralized.size === 0) return value
 
-  const shift = baseLevel - shallowest
+  const shift = shallowest > MAX_HEADING_LEVEL ? 0 : baseLevel - shallowest
   fence = undefined
   const out = []
-  for (const line of lines) {
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]
     if (fence !== undefined) {
       out.push(line)
       if (closesFence(line, fence)) fence = undefined
@@ -984,8 +1025,16 @@ function normalizeContentHeadings(text, baseLevel = CONTENT_HEADING_BASE) {
       out.push(line)
       continue
     }
+    if (neutralized.has(index)) {
+      if (out.length > 0 && out[out.length - 1].trim() !== '') out.push('')
+      // A lone `-` would become an empty list item once separated from the
+      // paragraph above it; escape it so it stays visible text.
+      out.push(/^ {0,3}-[ \t]*$/.test(line) ? line.replace(/^((?: {0,3}))-/, '$1\\-') : line)
+      if (index + 1 < lines.length && lines[index + 1].trim() !== '') out.push('')
+      continue
+    }
     const match = ATX_HEADING.exec(line)
-    if (match === null) {
+    if (match === null || shift === 0) {
       out.push(line)
       continue
     }

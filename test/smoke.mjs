@@ -394,6 +394,39 @@ await test('normalizeContentHeadings promotes deep-only headings and leaves non-
   assert.equal(__internal.normalizeContentHeadings('', 4), '')
 })
 
+await test('normalizeContentHeadings neutralizes setext headings from pasted logs', () => {
+  const source = [
+    '自检结果：(hlfusion) PS D:\\work> python check_env.py',
+    '==================================================================',
+    'Python',
+    '  version                 3.10.22',
+    '------------------------------------------------------------------',
+    'Packages',
+    '  numpy                   1.26.4',
+    '',
+    '---',
+    '',
+    '```text',
+    'Text',
+    '===',
+    '```',
+  ].join('\n')
+  const normalized = __internal.normalizeContentHeadings(source, 4)
+  assert.match(normalized, /自检结果：.*\n\n=+\n\nPython/)
+  assert.match(normalized, /3\.10\.22\n\n-+\n\nPackages/)
+  // A dash row after a blank line is already a thematic break, not a heading.
+  assert.match(normalized, /\n\n---\n\n/)
+  // Fenced code keeps setext-looking lines byte-for-byte.
+  assert.match(normalized, /```text\nText\n===\n```/)
+})
+
+await test('normalizeContentHeadings escapes a lone dash so it cannot become a list item', () => {
+  assert.equal(
+    __internal.normalizeContentHeadings('进度\n-\n下一步', 4),
+    '进度\n\n\\-\n\n下一步',
+  )
+})
+
 await test('renderMarkdown nests final-answer headings and keeps fenced code intact', () => {
   const events = fixtureEvents()
   events[6].data.message.content[0].text =

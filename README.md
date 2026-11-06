@@ -62,7 +62,7 @@
 dsh plugin --profile desktop add github:vi0let-dev/dsh-session-export
 
 # 锁定到某个 tag（推荐，避免以后 main 变化）
-dsh plugin --profile desktop add github:vi0let-dev/dsh-session-export#v1.0.1
+dsh plugin --profile desktop add github:vi0let-dev/dsh-session-export#v1.0.2
 ```
 
 GitHub 直装会在 profile 里放一份副本，不依赖本地插件目录；以后更新插件需要重新安装。
@@ -136,6 +136,8 @@ dsh-sessions-3-20261017-2315.json
 消息正文自带的 Markdown 标题会按**相对层级**整体嵌套到 `h4`–`h6`（例如正文里的 `#` 变成 `####`、`##` 变成 `#####`），
 避免和导出结构（会话 `h2` / 轮次 `h3`）抢标题层级；超过 `h6` 的更深层级会合并到 `h6`。
 代码围栏（三个反引号或波浪号）里的 `#` 是代码内容，不会被改动。
+另外，粘贴日志里常见的 `====` / `----` 分隔行不会再被 Markdown 当成 setext 标题；
+导出时会自动把这些行与上下文隔开，保留成普通分隔文本或水平线。
 
 ### JSON 结构
 
@@ -204,7 +206,7 @@ dsh-sessions-3-20261017-2315.json
 node test/smoke.mjs
 ```
 
-当前 19 项测试覆盖：
+当前 21 项测试覆盖：
 
 - 包名 / bundle patch / client id / locale / icon 一致性；
 - 默认内容只包含用户提问与最终回答；
@@ -212,6 +214,7 @@ node test/smoke.mjs
 - 未结束轮次的「进行中」判定；
 - Markdown / JSON 渲染、多会话合并、文件名清洗；
 - 正文标题按相对层级嵌套到 h4–h6，代码块内容不受影响；
+- 粘贴日志里的 `====` / `----` 不会被误判成 setext 标题；
 - 回环 Host 与自定义请求头校验；
 - `GET /list`、`POST /export`（活动会话与冷会话两条读路径）；
 - `apply` 的 webServer 路由挂载；
@@ -244,13 +247,15 @@ dsh plugin --profile desktop remove dsh-session-export
 
 ## 更新记录
 
+- **1.0.2**：修复粘贴的长日志中 `====` / `----` 分隔行被 Markdown 识别成 setext 标题、从而在导出文档里
+  产生正文 `h1`/`h2` 的问题。这类行现在会与上下文隔开，保留为普通分隔文本或水平线。
 - **1.0.1**：修复 Markdown 导出中正文标题与文档结构抢层级的问题。`用户提问` / `最终回答` 改为加粗标签，
   正文标题按相对层级嵌套到 `h4`–`h6`，代码块内的 `#` 保持不变。
 - **1.0.0**：首个版本。
 
 ## 版本
 
-- 插件版本：`1.0.1`
+- 插件版本：`1.0.2`
 - 开发/验证环境：DSH `0.2.1-rc.2` 桌面端，Node `24.x`
 - 许可证：MIT
 
